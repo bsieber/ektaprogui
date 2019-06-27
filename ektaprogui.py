@@ -62,8 +62,8 @@ class EktaproController:
         self.maxTray = 0
         for i in range(16):
             try:
-                s = serial.Serial(i, timeout=5)
-                logging.info("Device on port COM" + str(i + 1) + " found")
+                s = serial.Serial("/dev/ttyUSB" + str(i), timeout=5)
+                logging.info("Device on port /dev/ttyUSB" + str(i) + " found")
                 s.write(EktaproCommand(0).statusSystemReturn().toData())
                 deviceInfo = s.read(5)
                 ed = EktaproDevice(deviceInfo, s, i)
@@ -501,6 +501,11 @@ class EktaproDevice:
         self.slide = 0
 
         self.internalID = internalID
+      
+        self.client = mqtt.Client()
+	     self.client.on_connect = self.on_connect
+        self.client.on_message = self.on_message
+        self.client.connect("localhost", 1883, 60)
 
 
     def __str__(self):
@@ -519,7 +524,15 @@ class EktaproDevice:
                + modelStrings.get(self.projektorType, "Unknown") \
                + " id=" + `self.projektorID` \
                + " Version " + `self.projektorVersion`
+      
+    def on_connect(client, userdata, flags, rc):
+        print("Connected with result code " + str(rc))
+        print("Subscribe to projector/" + str(self.internalID) + "/#")
+        client.subscribe("projector/" + str(self.internalID) + "/#")
 
+    def on_message(client, userdata, msg):
+        print(msg.topic + " " + str(msg.payload))
+         
     def getDetails(self):
         return "Power frequency: " + ("60Hz" if self.powerFrequency == 1 else "50Hz") \
                + " Autofocus: " + ("On" if self.autoFocus == 1 else "Off") \
